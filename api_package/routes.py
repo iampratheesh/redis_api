@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import timedelta
 import pandas as pd
 from flask import jsonify
 from api_package import app, redis_client
@@ -43,6 +44,7 @@ def get_start_end_location(device_id):
             "end_location": (row_last.pop('latitude'),row_last.pop('longitude'))
         }
         redis_client.set(str(device_id) + "_location", json.dumps(info))
+        redis_client.expire(str(device_id) + "_location", timedelta(minutes=5))
     else:
         print("Cache Hit")
         info = json.loads(info)
@@ -63,6 +65,7 @@ def get_all_locations(device_id, start_time, end_time):
         }
         if not df.empty:
             redis_client.set(str(device_id) + start_time + end_time, json.dumps(info))
+            redis_client.expire(str(device_id) + start_time + end_time, timedelta(minutes=5))
     else:
         print("Cache Hit")
         info = json.loads(info)
