@@ -47,3 +47,23 @@ def get_start_end_location(device_id):
         print("Cache Hit")
         info = json.loads(info)
     return jsonify(info)
+
+
+@app.route("/get_all_locations/<int:device_id>/<string:start_time>/<string:end_time>")
+def get_all_locations(device_id, start_time, end_time):
+    print(device_id, start_time, end_time)
+    info = redis_client.get(str(device_id) + start_time + end_time)
+    if info is  None:
+        print("Cache Miss")
+        df = pd.read_csv(os.path.join(app.root_path, "data/raw_data.csv"))
+        df = df.sort_values('sts')
+        df = df.loc[(df['device_fk_id'] == device_id) & (df['time_stamp']>=start_time) & (df['time_stamp']<=end_time)].drop(columns=['device_fk_id', 'sts', 'speed'])
+        info = {
+            "location_points": df.values.tolist()
+        }
+        if not df.empty:
+            redis_client.set(str(device_id) + start_time + end_time, json.dumps(info))
+    else:
+        print("Cache Hit")
+        info = json.loads(info)
+    return jsonify(info)
