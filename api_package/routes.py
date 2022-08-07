@@ -2,8 +2,20 @@ import json
 import os
 from datetime import timedelta
 import pandas as pd
-from flask import jsonify
+from flask import jsonify, send_file
 from api_package import app, redis_client
+
+
+@app.route("/get_raw_data")
+def get_raw_data():
+    """Retrieves the raw data from file and converts to JSON
+
+    Returns:
+        JSON object: Raw data converted to JSON
+    """
+    df = pd.read_csv(os.path.join(app.root_path, "data/raw_data.csv"))
+    raw_dict = df.to_dict()
+    return jsonify(raw_dict)
 
 
 @app.route("/get_latest_info/<int:device_id>")
@@ -18,7 +30,6 @@ def get_latest_info(device_id):
     """
     info = redis_client.get(device_id)
     if info is None:
-        print("Cache Miss")
         df = pd.read_csv(os.path.join(app.root_path, "data/raw_data.csv"))
         df = df.sort_values("sts")
         df = df.groupby("device_fk_id", as_index=False).last()
@@ -28,7 +39,6 @@ def get_latest_info(device_id):
         info = row
         redis_client.set(device_id, json.dumps(row))
     else:
-        print("Cache Hit")
         info = json.loads(info)
         print(info)
     return jsonify(info)
@@ -46,7 +56,6 @@ def get_start_end_location(device_id):
     """
     info = redis_client.get(str(device_id) + "_location")
     if info is None:
-        print("Cache Miss")
         df = pd.read_csv(os.path.join(app.root_path, "data/raw_data.csv"))
         df = df.sort_values("sts")
         df_last = df.groupby("device_fk_id", as_index=False).last()
@@ -63,7 +72,6 @@ def get_start_end_location(device_id):
         redis_client.set(str(device_id) + "_location", json.dumps(info))
         redis_client.expire(str(device_id) + "_location", timedelta(minutes=5))
     else:
-        print("Cache Hit")
         info = json.loads(info)
     return jsonify(info)
 
@@ -83,7 +91,6 @@ def get_all_locations(device_id, start_time, end_time):
     print(device_id, start_time, end_time)
     info = redis_client.get(str(device_id) + start_time + end_time)
     if info is None:
-        print("Cache Miss")
         df = pd.read_csv(os.path.join(app.root_path, "data/raw_data.csv"))
         df = df.sort_values("sts")
         df = df.loc[
@@ -98,6 +105,5 @@ def get_all_locations(device_id, start_time, end_time):
                 str(device_id) + start_time + end_time, timedelta(minutes=5)
             )
     else:
-        print("Cache Hit")
         info = json.loads(info)
     return jsonify(info)
